@@ -1,9 +1,10 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 // Fix: Module '"@google/genai"' has no exported member 'LiveSession'.
 import { GoogleGenAI, Modality, Blob, LiveServerMessage } from '@google/genai';
 import { Speaker, TranscriptEntry } from './types';
 import { MicIcon, StopCircleIcon, UserIcon, BotIcon, UploadCloudIcon } from './components/icons';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
 
 // Inferred type for the LiveSession object, as it is not exported from the SDK.
 type LiveSession = Awaited<ReturnType<InstanceType<typeof GoogleGenAI>['live']['connect']>>;
@@ -86,6 +87,11 @@ const App: React.FC = () => {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcript]);
+  
+  useEffect(() => {
+    // Configure PDF.js worker. This is required for it to work in a browser environment.
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -103,18 +109,60 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleFileChange = (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
     setter: React.Dispatch<React.SetStateAction<string>>
   ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        setter(text);
-      };
-      reader.readAsText(file);
+    if (!file) {
+      return;
+    }
+
+    const fileName = file.name.toLowerCase();
+
+    try {
+      if (fileName.endsWith('.pdf')) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          if (arrayBuffer) {
+            const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+            const pdf = await loadingTask.promise;
+            let text = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const content = await page.getTextContent();
+              text += content.items.map(item => ('str' in item ? item.str : '')).join(' ') + '\n';
+            }
+            setter(text);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (fileName.endsWith('.docx')) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          if (arrayBuffer) {
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            setter(result.value);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (fileName.endsWith('.txt') || fileName.endsWith('.md')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setter(e.target?.result as string);
+        };
+        reader.readAsText(file);
+      } else {
+        alert('Unsupported file type. Please upload a .pdf, .docx, .txt, or .md file.');
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      alert('There was an error processing your file. It might be corrupted or in an unsupported format.');
+    } finally {
+        // Allows re-uploading the same file
+        event.target.value = '';
     }
   };
 
@@ -416,9 +464,9 @@ ${transcriptText}
                 <p className="text-xs text-gray-500 mt-1">You can paste content from a Google Doc or other sources.</p>
                 <label htmlFor="job-desc-file" className="mt-2 inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg cursor-pointer text-sm transition-colors duration-200">
                     <UploadCloudIcon className="w-4 h-4" />
-                    Upload File (.txt, .md)
+                    Upload File (.pdf, .docx, .txt, .md)
                 </label>
-                <input id="job-desc-file" type="file" className="hidden" accept=".txt,.md" onChange={(e) => handleFileChange(e, setJobDescription)} />
+                <input id="job-desc-file" type="file" className="hidden" accept=".pdf,.docx,.txt,.md" onChange={(e) => handleFileChange(e, setJobDescription)} />
             </div>
             <div>
                 <label htmlFor="resume" className="block text-sm font-medium text-gray-300 mb-2">Candidate Resume</label>
@@ -433,9 +481,9 @@ ${transcriptText}
                 <p className="text-xs text-gray-500 mt-1">You can paste content from a Google Doc or other sources.</p>
                 <label htmlFor="resume-file" className="mt-2 inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg cursor-pointer text-sm transition-colors duration-200">
                     <UploadCloudIcon className="w-4 h-4" />
-                    Upload File (.txt, .md)
+                    Upload File (.pdf, .docx, .txt, .md)
                 </label>
-                <input id="resume-file" type="file" className="hidden" accept=".txt,.md" onChange={(e) => handleFileChange(e, setResume)} />
+                <input id="resume-file" type="file" className="hidden" accept=".pdf,.docx,.txt,.md" onChange={(e) => handleFileChange(e, setResume)} />
             </div>
         </div>
     </div>
