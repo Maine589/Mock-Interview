@@ -1,0 +1,7 @@
+{
+  "name": "AI Mock Interview Coach",
+  "description": "Practice your interviewing skills by conducting a mock interview with an AI-powered candidate. After the interview, receive real-time, constructive feedback on your performance to help you improve.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
