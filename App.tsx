@@ -1,8 +1,9 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 // Fix: Module '"@google/genai"' has no exported member 'LiveSession'.
 import { GoogleGenAI, Modality, Blob, LiveServerMessage } from '@google/genai';
-import { Speaker, TranscriptEntry } from './types';
-import { MicIcon, StopCircleIcon, UserIcon, BotIcon, UploadCloudIcon } from './components/icons';
+import { Speaker, TranscriptEntry } from './types.ts';
+import { MicIcon, StopCircleIcon, UserIcon, BotIcon, UploadCloudIcon } from './components/icons.tsx';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
